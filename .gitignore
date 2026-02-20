@@ -1,0 +1,3 @@
+# Ignore dataset artifacts
+Dataset/data/
+Dataset/__pycache__
