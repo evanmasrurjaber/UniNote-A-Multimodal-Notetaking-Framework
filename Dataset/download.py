@@ -5,10 +5,10 @@ from video_download_pipeline import VideoDownloader
 script_dir = Path(__file__).resolve().parent
 
 # Initialize downloader
-downloader = VideoDownloader(output_dir=str(script_dir / 'data' / 'raw_videos'))
+downloader = VideoDownloader(output_dir=str(script_dir / 'data'))
 
 # Download test batch
-downloader.download_batch(str(script_dir / 'test_urls.csv'))
+downloader.download_batch(str(script_dir / 'video_urls.csv'))
 
 # Check statistics
 downloader.generate_statistics()

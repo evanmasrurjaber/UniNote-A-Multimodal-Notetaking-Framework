@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-UniNote Dataset Builder - Video Download Pipeline (FULLY FIXED)
-Works around Python 3.14 urllib.parse bug and JavaScript runtime issues
-"""
-
 import yt_dlp
 import json
 import os
@@ -15,7 +9,7 @@ import time
 import sys
 
 class VideoDownloader:
-    def __init__(self, output_dir='data/raw_videos'):
+    def __init__(self, output_dir='data'):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -44,20 +38,13 @@ class VideoDownloader:
             }
     
     def save_metadata(self):
-        """Save metadata to file"""
         with open(self.metadata_file, 'w', encoding='utf-8') as f:
             json.dump(self.collection_data, f, indent=2, ensure_ascii=False)
     
-    def download_video(self, url, subject, difficulty, source, video_index):
-        """
-        Download single video with metadata and transcription
-        
-        FULLY FIXED for Python 3.14 and JavaScript runtime issues
-        """
-        
+    def download_video(self, url, subject, source, video_index):
         print(f"\n{'='*80}")
         print(f"Downloading video {video_index}: {url}")
-        print(f"Subject: {subject} | Difficulty: {difficulty} | Source: {source}")
+        print(f"Subject: {subject} | Source: {source}")
         print(f"{'='*80}")
         
         # Generate video ID from URL
@@ -67,41 +54,30 @@ class VideoDownloader:
         if self._is_already_downloaded(video_id):
             print(f"⚠️  Video {video_id} already downloaded. Skipping...")
             return True
-        
-        # CRITICAL FIX: Disable automatic captions to avoid Python 3.14 urllib.parse bug
+
         ydl_opts = {
             # Format selection
             'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
-            
             # Output template
             'outtmpl': str(self.video_dir / f'{video_index:03d}_{video_id}.%(ext)s'),
-            
-            # CRITICAL FIX: Only get manual subtitles, NOT auto-generated
-            # This avoids the Python 3.14 urllib.parse.urlencode() hang
             'writesubtitles': True,
-            'writeautomaticsub': False,  # DISABLED - causes hang in Python 3.14
+            'writeautomaticsub': False,
             'subtitleslangs': ['en'],
             'subtitlesformat': 'vtt',
-            
             # Metadata
             'writeinfojson': True,
-            
             # Merge format
             'merge_output_format': 'mp4',
-            
             # Output control
             'quiet': False,
             'no_warnings': False,
             'ignoreerrors': False,
-            
             # Timeouts to prevent hanging
             'socket_timeout': 30,
-            
             # User agent
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             },
-            
             # Postprocessors
             'postprocessors': [{
                 'key': 'FFmpegVideoConvertor',
@@ -116,7 +92,7 @@ class VideoDownloader:
                 info = ydl.extract_info(url, download=True)
                 
                 # Extract and save metadata
-                metadata = self._extract_metadata(info, subject, difficulty, source, video_index)
+                metadata = self._extract_metadata(info, subject, source, video_index)
                 
                 # Save metadata JSON
                 metadata_file = self.metadata_dir / f'{video_index:03d}_{video_id}_metadata.json'
@@ -166,19 +142,15 @@ class VideoDownloader:
             return False
     
     def _generate_video_id(self, url):
-        """Generate unique ID from URL"""
         return hashlib.md5(url.encode()).hexdigest()[:12]
     
     def _is_already_downloaded(self, video_id):
-        """Check if video already downloaded"""
         for video in self.collection_data['videos']:
             if video['video_id'] == video_id:
                 return True
         return False
     
-    def _extract_metadata(self, info, subject, difficulty, source, video_index):
-        """Extract relevant metadata from yt-dlp info"""
-        
+    def _extract_metadata(self, info, subject, source, video_index):
         metadata = {
             'video_index': video_index,
             'video_id': self._generate_video_id(info.get('webpage_url', info.get('id', ''))),
@@ -201,9 +173,8 @@ class VideoDownloader:
             'filesize': info.get('filesize', 0),
             'has_manual_subtitles': 'en' in info.get('subtitles', {}),
             'filename': f"{video_index:03d}_{self._generate_video_id(info.get('webpage_url', ''))}.mp4",
-            # Our annotations
+
             'subject': subject,
-            'difficulty': difficulty,
             'source': source,
             'download_date': datetime.now().isoformat(),
         }
@@ -211,10 +182,6 @@ class VideoDownloader:
         return metadata
     
     def _extract_transcript_from_files(self, video_index, video_id):
-        """
-        Extract transcript from downloaded subtitle files
-        """
-        
         # Look for downloaded subtitle files
         vtt_files = list(self.video_dir.glob(f'{video_index:03d}_{video_id}*.vtt'))
         
@@ -252,8 +219,6 @@ class VideoDownloader:
             return False
     
     def _parse_vtt_content(self, vtt_content):
-        """Parse VTT content to plain text"""
-        
         lines = vtt_content.split('\n')
         transcript = []
         
@@ -282,11 +247,6 @@ class VideoDownloader:
         return ' '.join(transcript)
     
     def download_batch(self, video_list_file):
-        """
-        Download videos from CSV file
-        CSV format: url,subject,difficulty,source
-        """
-        
         if not Path(video_list_file).exists():
             print(f"❌ Video list file not found: {video_list_file}")
             return
@@ -299,8 +259,7 @@ class VideoDownloader:
         print(f"BATCH DOWNLOAD: {len(videos)} videos")
         print(f"Python version: {sys.version}")
         print(f"yt-dlp version: {yt_dlp.version.__version__}")
-        print(f"\n⚠️  NOTE: Auto-captions disabled due to Python 3.14 compatibility")
-        print(f"   Videos without manual subtitles will need Whisper transcription")
+        print(f"Videos without manual subtitles will need Whisper transcription")
         print(f"{'='*80}\n")
         
         success_count = 0
@@ -312,7 +271,6 @@ class VideoDownloader:
                 success = self.download_video(
                     url=row['url'],
                     subject=row['subject'],
-                    difficulty=row['difficulty'],
                     source=row['source'],
                     video_index=i
                 )
@@ -343,12 +301,9 @@ class VideoDownloader:
         print(f"{'='*80}\n")
         
         if no_subtitle_count > 0:
-            print(f"📝 Next step: Run Whisper transcription on {no_subtitle_count} videos")
-            print(f"   See whisper_transcription.py for instructions\n")
+            print(f"📝 Need Whisper transcription on {no_subtitle_count} videos")
     
     def generate_statistics(self):
-        """Generate download statistics"""
-        
         if not self.collection_data['videos']:
             print("No videos downloaded yet.")
             return
@@ -421,8 +376,5 @@ class VideoDownloader:
 
 
 if __name__ == '__main__':
-    # Example usage
-    downloader = VideoDownloader(output_dir='data/raw_videos')
-    
-    print("Video Downloader initialized (Python 3.14 COMPATIBLE)")
+    downloader = VideoDownloader(output_dir='data')
     print("Use: downloader.download_batch('video_urls.csv')")
