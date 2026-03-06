@@ -1,1 +1,0 @@
-print("Getting Started")

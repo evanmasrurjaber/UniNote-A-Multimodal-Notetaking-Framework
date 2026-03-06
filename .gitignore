@@ -1,3 +1,4 @@
 # Ignore dataset artifacts
 Dataset/data/
 Dataset/__pycache__
+dumps

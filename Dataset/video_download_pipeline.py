@@ -9,7 +9,7 @@ import time
 import sys
 
 class VideoDownloader:
-    def __init__(self, output_dir='data'):
+    def __init__(self, output_dir='data/raw_videos'):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -46,49 +46,55 @@ class VideoDownloader:
         print(f"Downloading video {video_index}: {url}")
         print(f"Subject: {subject} | Source: {source}")
         print(f"{'='*80}")
-        
-        # Generate video ID from URL
-        video_id = self._generate_video_id(url)
-        
-        # Check if already downloaded
-        if self._is_already_downloaded(video_id):
-            print(f"⚠️  Video {video_id} already downloaded. Skipping...")
-            return True
 
-        ydl_opts = {
-            # Format selection
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
-            # Output template
-            'outtmpl': str(self.video_dir / f'{video_index:03d}_{video_id}.%(ext)s'),
-            'writesubtitles': True,
-            'writeautomaticsub': False,
-            'subtitleslangs': ['en'],
-            'subtitlesformat': 'vtt',
-            # Metadata
-            'writeinfojson': True,
-            # Merge format
-            'merge_output_format': 'mp4',
-            # Output control
-            'quiet': False,
-            'no_warnings': False,
-            'ignoreerrors': False,
-            # Timeouts to prevent hanging
-            'socket_timeout': 30,
-            # User agent
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            # Postprocessors
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            }],
-        }
-        
         try:
-            # Download video and extract info
+            # First, extract info without downloading to resolve the canonical URL
+            print("⏳ Extracting video information...")
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+            # Generate video ID from resolved webpage_url
+            resolved_url = info.get('webpage_url', url)
+            video_id = self._generate_video_id(resolved_url)
+
+            # Check if already downloaded
+            if self._is_already_downloaded(video_id):
+                print(f"⚠️  Video {video_id} already downloaded. Skipping...")
+                return True
+
+            ydl_opts = {
+                # Format selection
+                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+                # Output template
+                'outtmpl': str(self.video_dir / f'{video_index:03d}_{video_id}.%(ext)s'),
+                'writesubtitles': True,
+                'writeautomaticsub': False,
+                'subtitleslangs': ['en'],
+                'subtitlesformat': 'vtt',
+                # Metadata
+                'writeinfojson': False,
+                # Merge format
+                'merge_output_format': 'mp4',
+                # Output control
+                'quiet': False,
+                'no_warnings': False,
+                'ignoreerrors': False,
+                # Timeouts to prevent hanging
+                'socket_timeout': 30,
+                # User agent
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                # Postprocessors
+                'postprocessors': [{
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                }],
+            }
+
+            # Now download the video with the correct filename
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print("⏳ Extracting video information...")
+                print("⏳ Downloading video...")
                 info = ydl.extract_info(url, download=True)
                 
                 # Extract and save metadata
@@ -211,6 +217,9 @@ class VideoDownloader:
             with open(txt_dest, 'w', encoding='utf-8') as f:
                 f.write(transcript_text)
             
+            # Remove the original .vtt from videos/ to avoid redundancy
+            vtt_file.unlink()
+
             print(f"   ✅ Transcript extracted: {len(transcript_text)} characters")
             return True
             
@@ -311,7 +320,6 @@ class VideoDownloader:
         stats = {
             'total_videos': len(self.collection_data['videos']),
             'by_subject': {},
-            'by_difficulty': {},
             'by_source': {},
             'total_duration_hours': 0,
             'avg_duration_minutes': 0,
@@ -323,11 +331,7 @@ class VideoDownloader:
             # Subject distribution
             subject = video['subject']
             stats['by_subject'][subject] = stats['by_subject'].get(subject, 0) + 1
-            
-            # Difficulty distribution
-            difficulty = video['difficulty']
-            stats['by_difficulty'][difficulty] = stats['by_difficulty'].get(difficulty, 0) + 1
-            
+    
             # Source distribution
             source = video['source']
             stats['by_source'][source] = stats['by_source'].get(source, 0) + 1
@@ -357,10 +361,6 @@ class VideoDownloader:
         for subject, count in sorted(stats['by_subject'].items()):
             print(f"  {subject}: {count} ({count/stats['total_videos']*100:.1f}%)")
         
-        print(f"\nBy Difficulty:")
-        for difficulty, count in sorted(stats['by_difficulty'].items()):
-            print(f"  {difficulty}: {count} ({count/stats['total_videos']*100:.1f}%)")
-        
         print(f"\nBy Source:")
         for source, count in sorted(stats['by_source'].items()):
             print(f"  {source}: {count} ({count/stats['total_videos']*100:.1f}%)")
@@ -376,5 +376,5 @@ class VideoDownloader:
 
 
 if __name__ == '__main__':
-    downloader = VideoDownloader(output_dir='data')
+    downloader = VideoDownloader(output_dir='data/raw_videos')
     print("Use: downloader.download_batch('video_urls.csv')")
