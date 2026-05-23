@@ -2,3 +2,4 @@
 Dataset/data/
 Dataset/__pycache__
 dumps
+.venv
