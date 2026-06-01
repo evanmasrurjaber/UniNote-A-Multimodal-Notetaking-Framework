@@ -185,11 +185,11 @@ def build_strict_dataset(course_id, youtube_playlist_url, ocw_notes_url, base_pa
     print(f"\n🎉 Strict dataset collection for {course_id} complete!")
 
 if __name__ == "__main__":
-    COURSE_ID = "6.006_Introduction_to_Algorithms"
+    COURSE_ID = "6.7960_Deep_Learning"
     
-    YOUTUBE_URL = "https://youtube.com/playlist?list=PLUl4u3cNGP63EdVPNLG3ToM6LaEUuStEY&si=NbPW_MNTA3Ppgk1o"
+    YOUTUBE_URL = "https://youtube.com/playlist?list=PLUl4u3cNGP63URZnh5iqBzDTDYPUTQT-8&si=Bufu5MrwIQIpoq1-"
     
     # Updated to the new targeted Lecture Notes page
-    OCW_URL = "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-notes/"
+    OCW_URL = "https://ocw.mit.edu/courses/6-7960-deep-learning-fall-2024/resources/lecture-notes/"
     
     build_strict_dataset(COURSE_ID, YOUTUBE_URL, OCW_URL)
