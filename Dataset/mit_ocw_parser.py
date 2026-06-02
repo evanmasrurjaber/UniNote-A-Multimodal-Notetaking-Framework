@@ -40,22 +40,18 @@ def download_ocw_notes(ocw_notes_url, notes_folder, course_id):
     pdf_links = set()
     resource_pages = set()
 
-    # Pass 1: Surface scan the index page
     for link in soup.find_all('a', href=True):
         full_url = urljoin(ocw_notes_url, link['href'])
         link_text = link.text.strip().lower()
         clean_url = full_url.split('?')[0]
         
-        # Direct PDF found on the main page
         if clean_url.lower().endswith('.pdf'):
             pdf_links.add(full_url)
             
-        # Resource pages hosted on OCW (we look for lecture-related keywords)
         elif '/resources/' in full_url.lower():
             if any(keyword in full_url.lower() or keyword in link_text for keyword in ['lec', 'lecture', 'note', 'session']):
                 resource_pages.add(full_url)
 
-    # Pass 2: Deep crawl the discovered resource pages
     if resource_pages:
         print(f"🕵️ Deep scanning {len(resource_pages)} potential lecture resource pages...")
         for res_url in resource_pages:
@@ -67,13 +63,11 @@ def download_ocw_notes(ocw_notes_url, notes_folder, course_id):
                     sub_url = urljoin(res_url, sub_link['href'])
                     sub_clean = sub_url.split('?')[0]
                     
-                    # Look for actual files or explicit download buttons
                     if sub_clean.lower().endswith('.pdf') or '?download=true' in sub_url.lower():
                         pdf_links.add(sub_url)
             except Exception:
-                pass # Silently skip timeouts to keep pipeline moving
+                pass 
 
-    # De-duplicate to prevent downloading the same file multiple times via different URL parameters
     unique_pdfs = {}
     for url in pdf_links:
         filename = unquote(url.split('?')[0].split('/')[-1])
@@ -82,9 +76,7 @@ def download_ocw_notes(ocw_notes_url, notes_folder, course_id):
 
     print(f"🔍 Discovered {len(unique_pdfs)} unique PDF documents.")
 
-    # Pass 3: Download and Extract Lecture Numbers
     for filename, pdf_url in unique_pdfs.items():
-        # Strictly exclude problem sets, solutions, exams, and reviews
         if any(skip_word in filename.lower() for skip_word in ['review', 'quiz', 'exam', 'midterm', 'final', 'prob', 'ps', 'sol', 'recitation', 'r0']):
             continue
 
@@ -112,7 +104,7 @@ def download_ocw_notes(ocw_notes_url, notes_folder, course_id):
 
 def download_matched_videos(playlist_url, course_id, video_folder, valid_lecture_numbers):
     """
-    Scrapes playlist metadata, filters out unmatched videos, and downloads the rest.
+    Scrapes playlist metadata, filters out unmatched videos, and downloads the rest along with their manual subtitles.
     """
     print(f"\n🎥 Analyzing YouTube Playlist for Matched Videos...")
     
@@ -131,7 +123,6 @@ def download_matched_videos(playlist_url, course_id, video_folder, valid_lecture
         title = entry.get('title', '')
         url = entry.get('url')
         
-        # Skip reviews and non-lectures
         if any(skip_word in title.lower() for skip_word in ['review', 'quiz', 'exam', 'midterm', 'final', 'problem session', 'recitation']):
             print(f"⏩ Skipping (Review/Session): {title}")
             continue
@@ -144,12 +135,15 @@ def download_matched_videos(playlist_url, course_id, video_folder, valid_lecture
         else:
             print(f"❌ No matching PDF found for: {title} (Extracted Num: {lec_num}) - Skipping.")
 
-    print(f"\n📥 Proceeding to download {len(matched_video_urls)} matched videos...")
+    print(f"\n📥 Proceeding to download {len(matched_video_urls)} matched videos and transcripts...")
 
     download_opts = {
         'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
         'outtmpl': os.path.join(video_folder, f'{course_id}_%(title)s.%(ext)s'),
-        'writesubtitles': False,
+        'writesubtitles': True,         # Force subtitle download
+        'writeautomaticsub': False,     # Strictly ignore YouTube Auto-Captions
+        'subtitleslangs': ['en.*'],       # Request English subtitles
+        'subtitlesformat': 'vtt',       # Save as WebVTT format to match Whisper output
         'writeinfojson': True, 
         'ignoreerrors': True,
     }
@@ -186,10 +180,7 @@ def build_strict_dataset(course_id, youtube_playlist_url, ocw_notes_url, base_pa
 
 if __name__ == "__main__":
     COURSE_ID = "6.7960_Deep_Learning"
-    
     YOUTUBE_URL = "https://youtube.com/playlist?list=PLUl4u3cNGP63URZnh5iqBzDTDYPUTQT-8&si=Bufu5MrwIQIpoq1-"
-    
-    # Updated to the new targeted Lecture Notes page
     OCW_URL = "https://ocw.mit.edu/courses/6-7960-deep-learning-fall-2024/resources/lecture-notes/"
     
     build_strict_dataset(COURSE_ID, YOUTUBE_URL, OCW_URL)
